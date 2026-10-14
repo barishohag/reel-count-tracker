@@ -2,10 +2,14 @@ package com.reelcount.app
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -28,6 +32,16 @@ class MainActivity : Activity() {
     private var onboardingGoal: Int? = null
     private val onboardingPreferences = mutableMapOf<String, Boolean>()
     private lateinit var page: LinearLayout
+    private var usageTotalView: TextView? = null
+    private var usageAccessHint: TextView? = null
+    private val usagePlatformViews = mutableMapOf<String, TextView>()
+    private val usageRefreshHandler = Handler(Looper.getMainLooper())
+    private val usageRefreshTask = object : Runnable {
+        override fun run() {
+            if (prefs.getBoolean("onboarding_complete", false)) refreshUsageViews()
+            usageRefreshHandler.postDelayed(this, 30_000L)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,6 +55,18 @@ class MainActivity : Activity() {
         onboardingPreferences["count_all_day"] = prefs.getBoolean("pref_count_all_day", true)
         onboardingPreferences["count_every_logged_reel"] = prefs.getBoolean("pref_count_every_logged_reel", true)
         if (prefs.getBoolean("onboarding_complete", false)) render() else renderOnboarding()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (prefs.getBoolean("onboarding_complete", false)) render()
+        usageRefreshHandler.removeCallbacks(usageRefreshTask)
+        usageRefreshHandler.postDelayed(usageRefreshTask, 30_000L)
+    }
+
+    override fun onPause() {
+        usageRefreshHandler.removeCallbacks(usageRefreshTask)
+        super.onPause()
     }
 
     private fun render() {
@@ -85,19 +111,59 @@ class MainActivity : Activity() {
             setPadding(0, dp(4), 0, dp(19))
         })
 
+        val usageTitle = sectionTitle("App time today", "Automatic foreground time across your social apps")
+        page.addView(usageTitle.first)
+        val usageCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(Color.WHITE, 24)
+            setPadding(dp(18), dp(16), dp(18), dp(17))
+        }
+        usageTotalView = text("0 min", 36, ink, true).apply { includeFontPadding = false }
+        usageCard.addView(usageTotalView)
+        usageCard.addView(text("TOTAL TIME · TODAY", 10, muted, true).apply {
+            letterSpacing = .1f
+            setPadding(0, dp(5), 0, dp(13))
+        })
+        usagePlatformViews.clear()
+        SocialUsageTracker.apps.forEachIndexed { index, app ->
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            row.addView(text(app.name, 14, ink, true), LinearLayout.LayoutParams(0, dp(38), 1f))
+            val value = text("0 min", 14, muted, true).apply { gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL }
+            usagePlatformViews[app.name] = value
+            row.addView(value)
+            usageCard.addView(row)
+            if (index < SocialUsageTracker.apps.lastIndex) {
+                usageCard.addView(View(this).apply { setBackgroundColor(Color.rgb(239, 241, 237)) }, LinearLayout.LayoutParams(-1, dp(1)))
+            }
+        }
+        val accessButton = text("Enable automatic tracking", 14, ink, true).apply {
+            gravity = Gravity.CENTER
+            background = rounded(green, 14)
+            setPadding(dp(12), dp(14), dp(12), dp(14))
+            tag = "usage_access_button"
+            setOnClickListener { openUsageAccessSettings() }
+        }
+        usageCard.addView(accessButton, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        usageAccessHint = text("Allow Usage Access so Android can record app time while Reel Count is closed. Data stays on this device.", 11, muted, false).apply {
+            setPadding(dp(2), dp(10), dp(2), 0)
+        }
+        usageCard.addView(usageAccessHint)
+        page.addView(usageCard)
+        refreshUsageViews()
+
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = rounded(Color.WHITE, 26)
             setPadding(dp(22), dp(22), dp(22), dp(22))
         }
-        hero.addView(text("YOUR SCROLL,\nIN NUMBERS", 12, muted, true).apply { letterSpacing = .12f })
+        hero.addView(text("MANUAL REEL TALLY", 12, muted, true).apply { letterSpacing = .12f })
         val countText = if (showCount) total.toString() else "•••"
         val count = text(countText, 76, ink, true).apply {
             setPadding(0, dp(3), 0, 0)
             includeFontPadding = false
         }
         hero.addView(count)
-        hero.addView(text("reels watched today", 15, muted, false).apply { setPadding(0, dp(3), 0, dp(20)) })
+        hero.addView(text("reels logged today", 15, muted, false).apply { setPadding(0, dp(3), 0, dp(20)) })
 
         val goalRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         goalRow.addView(text("Daily goal · edit", 13, ink, true).apply {
@@ -124,9 +190,9 @@ class MainActivity : Activity() {
         hero.addView(add, LinearLayout.LayoutParams(-1, -2))
         page.addView(hero)
 
-        page.addView(sectionTitle("Where did you watch?", "Choose a platform before logging"))
+        page.addView(sectionTitle("Manual reel tally", "Choose a platform before logging a reel"))
         val platforms = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("Instagram", "TikTok", "YouTube").forEachIndexed { index, platform ->
+        listOf("Facebook", "Instagram", "TikTok").forEachIndexed { index, platform ->
             val chip = text(platform, 13, if (platform == selectedPlatform) Color.WHITE else ink, platform == selectedPlatform).apply {
                 gravity = Gravity.CENTER
                 background = rounded(if (platform == selectedPlatform) ink else Color.WHITE, 24)
@@ -137,7 +203,7 @@ class MainActivity : Activity() {
         }
         page.addView(platforms)
 
-        val todayPlatformCounts = listOf("Instagram", "TikTok", "YouTube").map { it to countFor(todayKey, it) }.filter { it.second > 0 }
+        val todayPlatformCounts = listOf("Facebook", "Instagram", "TikTok").map { it to countFor(todayKey, it) }.filter { it.second > 0 }
         if (todayPlatformCounts.isNotEmpty()) {
             val summary = todayPlatformCounts.joinToString("     ·     ") { "${it.first} ${it.second}" }
             page.addView(text(summary, 12, muted, false).apply { setPadding(dp(2), dp(12), 0, 0) })
@@ -268,35 +334,29 @@ class MainActivity : Activity() {
             }
             3 -> {
                 content.addView(text("🧠🔒", 56, Color.WHITE, false).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dp(12)) })
-                content.addView(onboardHeading("We only count reels", Color.WHITE).apply { gravity = Gravity.CENTER })
+                content.addView(onboardHeading("Track app time\nautomatically", Color.WHITE).apply { gravity = Gravity.CENTER })
                 val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(0, dp(14), 0, dp(12)) }
-                chips.addView(text("🔒 Saved on this device", 10, orange, true).apply {
+                chips.addView(text("🔒 On this device", 10, orange, true).apply {
                     background = rounded(card, 30); setPadding(dp(10), dp(8), dp(10), dp(8))
                 })
-                chips.addView(text("Change anytime", 10, orange, true).apply {
+                chips.addView(text("You control access", 10, orange, true).apply {
                     background = rounded(card, 30); setPadding(dp(10), dp(8), dp(10), dp(8))
                 }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(7) })
                 content.addView(chips)
-
-                val settings = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(card, 20); setPadding(dp(15), dp(4), dp(15), dp(4)) }
-                listOf(
-                    "show_count" to "See my count on the dashboard",
-                    "count_all_day" to "Count throughout the day",
-                    "count_every_logged_reel" to "Count every reel I log"
-                ).forEachIndexed { index, (key, label) ->
-                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-                    row.addView(text(label, 13, Color.WHITE, true), LinearLayout.LayoutParams(0, dp(57), 1f))
-                    row.addView(android.widget.Switch(this).apply {
-                        isChecked = onboardingPreferences[key] ?: true
-                        setOnCheckedChangeListener { _, checked -> onboardingPreferences[key] = checked }
-                        contentDescription = label
-                    })
-                    settings.addView(row)
-                    if (index < 2) settings.addView(View(this).apply { setBackgroundColor(Color.rgb(42, 40, 35)) }, LinearLayout.LayoutParams(-1, dp(1)))
+                val explanation = text("Usage Access lets Android measure how long Facebook, Instagram, and TikTok stay in the foreground, even while Reel Count is closed. It does not identify individual Reels or upload your usage.", 13, Color.WHITE, false).apply {
+                    background = rounded(card, 18)
+                    setPadding(dp(16), dp(16), dp(16), dp(16))
                 }
-                content.addView(settings)
-                content.addView(text("Your answers stay on this device. Reel counting is manual in this version; these switches save preferences and do not grant background access.", 11, Color.rgb(153, 147, 141), false).apply {
+                content.addView(explanation)
+                content.addView(text("Grant access in Android Settings now, or skip and enable it from your dashboard later.", 11, Color.rgb(153, 147, 141), false).apply {
                     setPadding(dp(2), dp(12), dp(2), 0)
+                })
+                content.addView(text(if (SocialUsageTracker.hasAccess(this)) "✓ Usage Access is enabled" else "Open Usage Access settings", 13, orange, true).apply {
+                    gravity = Gravity.CENTER
+                    background = rounded(card, 30)
+                    setPadding(dp(14), dp(13), dp(14), dp(13))
+                    setOnClickListener { openUsageAccessSettings() }
+                    contentDescription = "Open Android Usage Access settings"
                 })
             }
             else -> {
@@ -307,9 +367,9 @@ class MainActivity : Activity() {
                 })
                 val summary = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(card, 20); setPadding(dp(18), dp(14), dp(18), dp(14)) }
                 summary.addView(text("YOUR STARTING PLAN", 10, Color.rgb(170, 164, 156), true).apply { letterSpacing = .1f; setPadding(0, 0, 0, dp(6)) })
-                summary.addView(summaryRow("Daily watch time", onboardingTime ?: "Not set"))
-                summary.addView(summaryRow("Your reel goal", "${onboardingGoal ?: 50} a day"))
-                summary.addView(summaryRow("Tracking", "Manual log"))
+                summary.addView(summaryRow("Your daily watch time", onboardingTime ?: "Not set"))
+                summary.addView(summaryRow("Your manual reel goal", "${onboardingGoal ?: 50} a day"))
+                summary.addView(summaryRow("App-time tracking", if (SocialUsageTracker.hasAccess(this)) "Enabled" else "Enable in Settings"))
                 content.addView(summary)
             }
         }
@@ -337,9 +397,6 @@ class MainActivity : Activity() {
                             .putString("onboard_time", onboardingTime)
                             .putInt("onboard_goal", goal)
                             .putInt("goal", goal)
-                            .putBoolean("pref_show_count", onboardingPreferences["show_count"] ?: true)
-                            .putBoolean("pref_count_all_day", onboardingPreferences["count_all_day"] ?: true)
-                            .putBoolean("pref_count_every_logged_reel", onboardingPreferences["count_every_logged_reel"] ?: true)
                             .apply()
                         render()
                     }
@@ -403,7 +460,34 @@ class MainActivity : Activity() {
 
     private fun countFor(day: String, platform: String) = prefs.getInt("${platform.lowercase(Locale.ROOT)}_$day", 0)
 
-    private fun totalFor(day: String) = listOf("Instagram", "TikTok", "YouTube").sumOf { countFor(day, it) }
+    private fun totalFor(day: String) = listOf("Facebook", "Instagram", "TikTok").sumOf { countFor(day, it) }
+
+    private fun openUsageAccessSettings() {
+        startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+    }
+
+    private fun refreshUsageViews() {
+        val hasAccess = SocialUsageTracker.hasAccess(this)
+        usageAccessHint?.text = if (hasAccess) {
+            "Foreground app time only, not individual Reels. Refreshes every 30 seconds while this dashboard is open."
+        } else {
+            "Allow Usage Access so Android can record app time while Reel Count is closed. Data stays on this device."
+        }
+        page.findViewWithTag<TextView>("usage_access_button")?.visibility = if (hasAccess) View.GONE else View.VISIBLE
+        if (!hasAccess) return
+
+        val usage = SocialUsageTracker.todayMillis(this)
+        usageTotalView?.text = formatDuration(usage.values.sum())
+        usagePlatformViews.forEach { (platform, view) -> view.text = formatDuration(usage[platform] ?: 0L) }
+    }
+
+    private fun formatDuration(milliseconds: Long): String {
+        val minutes = (milliseconds / 60_000L).toInt()
+        if (minutes == 0) return if (milliseconds > 0) "<1 min" else "0 min"
+        val hours = minutes / 60
+        val remainingMinutes = minutes % 60
+        return if (hours > 0) "${hours}h ${remainingMinutes}m" else "$minutes min"
+    }
 
     private fun text(value: String, size: Int, color: Int, bold: Boolean) = TextView(this).apply {
         text = value
@@ -420,3 +504,4 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }
+
