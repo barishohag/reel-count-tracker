@@ -1,0 +1,422 @@
+package com.reelcount.app
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.view.Gravity
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+class MainActivity : Activity() {
+    private val ink = Color.rgb(27, 35, 31)
+    private val muted = Color.rgb(119, 128, 121)
+    private val paper = Color.rgb(245, 246, 242)
+    private val green = Color.rgb(185, 243, 107)
+    private val prefs by lazy { getSharedPreferences("reel_count", MODE_PRIVATE) }
+    private var selectedPlatform = "Instagram"
+    private var onboardingStep = 0
+    private var onboardingTime: String? = null
+    private var onboardingGoal: Int? = null
+    private val onboardingPreferences = mutableMapOf<String, Boolean>()
+    private lateinit var page: LinearLayout
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.rgb(9, 8, 7)
+        window.navigationBarColor = paper
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        onboardingTime = prefs.getString("onboard_time", null)
+        onboardingGoal = prefs.getInt("onboard_goal", -1).takeIf { it > 0 }
+        onboardingPreferences["show_count"] = prefs.getBoolean("pref_show_count", true)
+        onboardingPreferences["count_all_day"] = prefs.getBoolean("pref_count_all_day", true)
+        onboardingPreferences["count_every_logged_reel"] = prefs.getBoolean("pref_count_every_logged_reel", true)
+        if (prefs.getBoolean("onboarding_complete", false)) render() else renderOnboarding()
+    }
+
+    private fun render() {
+        window.statusBarColor = paper
+        window.navigationBarColor = paper
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(paper)
+            clipToPadding = false
+            isFillViewport = true
+        }
+        page = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(18), dp(22), dp(30))
+        }
+        scroll.addView(page)
+        setContentView(scroll)
+
+        val today = LocalDate.now()
+        val todayKey = today.toString()
+        val total = totalFor(todayKey)
+        val goal = prefs.getInt("goal", 60).coerceAtLeast(1)
+        val showCount = !prefs.getBoolean("onboarding_complete", false) || prefs.getBoolean("pref_show_count", true)
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val brand = text("reel count", 22, ink, true)
+        header.addView(brand, LinearLayout.LayoutParams(0, dp(42), 1f))
+        val badge = text("DAILY RESET", 10, muted, true).apply {
+            letterSpacing = .08f
+            gravity = Gravity.CENTER
+            background = rounded(Color.WHITE, 30)
+            setPadding(dp(13), dp(9), dp(13), dp(9))
+        }
+        header.addView(badge)
+        page.addView(header)
+
+        page.addView(text(today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())), 14, muted, false).apply {
+            setPadding(0, dp(4), 0, dp(19))
+        })
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(Color.WHITE, 26)
+            setPadding(dp(22), dp(22), dp(22), dp(22))
+        }
+        hero.addView(text("YOUR SCROLL,\nIN NUMBERS", 12, muted, true).apply { letterSpacing = .12f })
+        val countText = if (showCount) total.toString() else "•••"
+        val count = text(countText, 76, ink, true).apply {
+            setPadding(0, dp(3), 0, 0)
+            includeFontPadding = false
+        }
+        hero.addView(count)
+        hero.addView(text("reels watched today", 15, muted, false).apply { setPadding(0, dp(3), 0, dp(20)) })
+
+        val goalRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        goalRow.addView(text("Daily goal · edit", 13, ink, true).apply {
+            setOnClickListener { showGoalDialog() }
+        }, LinearLayout.LayoutParams(0, dp(28), 1f))
+        goalRow.addView(text(if (showCount) "$total / $goal" else "••• / $goal", 13, ink, true))
+        hero.addView(goalRow)
+        val track = LinearLayout(this).apply {
+            background = rounded(Color.rgb(235, 237, 232), 20)
+            clipToOutline = true
+        }
+        val fill = View(this).apply { background = rounded(ink, 20) }
+        track.addView(fill, LinearLayout.LayoutParams(0, dp(8)).apply { weight = if (showCount) (total.toFloat() / goal).coerceAtMost(1f).coerceAtLeast(0.015f) else 0.015f })
+        hero.addView(track, LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(8) })
+        hero.addView(text(if (!showCount) "Count display is hidden. You can still log reels." else if (total >= goal) "You reached today's goal." else "${(goal - total).coerceAtLeast(0)} more to reach your goal", 12, muted, false).apply {
+            setPadding(0, dp(10), 0, dp(18))
+        })
+        val add = text("＋   Log 1 reel", 16, ink, true).apply {
+            gravity = Gravity.CENTER
+            background = rounded(green, 16)
+            setPadding(0, dp(16), 0, dp(16))
+            setOnClickListener { changeCount(todayKey, selectedPlatform, 1); render() }
+        }
+        hero.addView(add, LinearLayout.LayoutParams(-1, -2))
+        page.addView(hero)
+
+        page.addView(sectionTitle("Where did you watch?", "Choose a platform before logging"))
+        val platforms = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        listOf("Instagram", "TikTok", "YouTube").forEachIndexed { index, platform ->
+            val chip = text(platform, 13, if (platform == selectedPlatform) Color.WHITE else ink, platform == selectedPlatform).apply {
+                gravity = Gravity.CENTER
+                background = rounded(if (platform == selectedPlatform) ink else Color.WHITE, 24)
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                setOnClickListener { selectedPlatform = platform; render() }
+            }
+            platforms.addView(chip, LinearLayout.LayoutParams(0, dp(44), 1f).apply { if (index > 0) leftMargin = dp(8) })
+        }
+        page.addView(platforms)
+
+        val todayPlatformCounts = listOf("Instagram", "TikTok", "YouTube").map { it to countFor(todayKey, it) }.filter { it.second > 0 }
+        if (todayPlatformCounts.isNotEmpty()) {
+            val summary = todayPlatformCounts.joinToString("     ·     ") { "${it.first} ${it.second}" }
+            page.addView(text(summary, 12, muted, false).apply { setPadding(dp(2), dp(12), 0, 0) })
+        }
+
+        val weekHeader = sectionTitle("This week", "Your last 7 days")
+        page.addView(weekHeader.first)
+        val week = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = rounded(Color.WHITE, 24)
+            setPadding(dp(18), dp(8), dp(18), dp(8))
+        }
+        val dates = (6 downTo 0).map { today.minusDays(it.toLong()) }
+        val maxCount = dates.maxOfOrNull { totalFor(it.toString()) }?.coerceAtLeast(1) ?: 1
+        dates.forEach { date ->
+            val key = date.toString()
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val day = if (date == today) "Today" else date.format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault()))
+            row.addView(text(day, 12, if (date == today) ink else muted, date == today), LinearLayout.LayoutParams(dp(48), dp(43)))
+            val barArea = LinearLayout(this).apply { background = rounded(Color.rgb(242, 243, 239), 12); clipToOutline = true }
+            val barWidth = (totalFor(key).toFloat() / maxCount).coerceAtLeast(if (totalFor(key) > 0) .04f else 0f)
+            val bar = View(this).apply { background = rounded(if (date == today) green else Color.rgb(215, 222, 212), 12) }
+            if (totalFor(key) > 0) {
+                barArea.addView(bar, LinearLayout.LayoutParams(0, dp(7)).apply { weight = barWidth })
+                if (barWidth < 1f) barArea.addView(View(this).apply { setBackgroundColor(Color.TRANSPARENT) }, LinearLayout.LayoutParams(0, dp(7)).apply { weight = 1f - barWidth })
+            }
+            row.addView(barArea, LinearLayout.LayoutParams(0, dp(7), 1f))
+            row.addView(text(totalFor(key).toString(), 12, ink, true).apply { gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL }, LinearLayout.LayoutParams(dp(38), dp(38)))
+            week.addView(row)
+        }
+        page.addView(week)
+
+        val undo = text("Undo last reel", 13, muted, false).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(22), 0, dp(8))
+            setOnClickListener {
+                if (countFor(todayKey, selectedPlatform) > 0) {
+                    changeCount(todayKey, selectedPlatform, -1)
+                    render()
+                } else Toast.makeText(this@MainActivity, "No ${selectedPlatform} reels to undo today", Toast.LENGTH_SHORT).show()
+            }
+        }
+        page.addView(undo)
+        page.addView(text("Review your setup", 12, muted, false).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(8))
+            setOnClickListener { onboardingStep = 0; renderOnboarding() }
+        })
+        page.addView(text("Counts stay on this device. Tap the goal card to change your daily target.", 11, muted, false).apply {
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(8), dp(10), 0)
+        })
+    }
+
+    private fun renderOnboarding() {
+        window.statusBarColor = Color.rgb(9, 8, 7)
+        window.navigationBarColor = Color.rgb(9, 8, 7)
+        @Suppress("DEPRECATION")
+        window.decorView.systemUiVisibility = 0
+
+        val dark = Color.rgb(9, 8, 7)
+        val card = Color.rgb(23, 22, 19)
+        val orange = Color.rgb(255, 185, 118)
+        val scroll = ScrollView(this).apply { setBackgroundColor(dark); isFillViewport = true }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(12), dp(22), dp(18))
+            minimumHeight = resources.displayMetrics.heightPixels
+        }
+        scroll.addView(root, ScrollView.LayoutParams(-1, -1))
+        setContentView(scroll)
+
+        val status = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        status.addView(text("Reel Count", 12, Color.WHITE, true), LinearLayout.LayoutParams(0, dp(30), 1f))
+        status.addView(text("●  ●  ●    ▰", 11, Color.WHITE, true).apply { gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL })
+        root.addView(status)
+
+        val progress = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        repeat(5) { index ->
+            val segment = View(this).apply { background = rounded(if (index <= onboardingStep) orange else Color.rgb(40, 38, 34), 5) }
+            progress.addView(segment, LinearLayout.LayoutParams(0, dp(3), 1f).apply { if (index > 0) leftMargin = dp(5) })
+        }
+        root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)).apply { topMargin = dp(10) })
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = if (onboardingStep == 0 || onboardingStep == 4) Gravity.CENTER else Gravity.CENTER_VERTICAL
+        }
+        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(18); bottomMargin = dp(16) })
+
+        when (onboardingStep) {
+            0 -> {
+                content.addView(text("🧠", 72, Color.WHITE, false).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dp(24)) })
+                content.addView(onboardHeading("Win back\nstudy time", orange).apply { gravity = Gravity.CENTER })
+                content.addView(text("Starting today.", 17, Color.rgb(153, 147, 141), false).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(13), 0, 0)
+                })
+            }
+            1, 2 -> {
+                val isTime = onboardingStep == 1
+                val question = if (isTime) "How much time do you spend on Reels/Shorts daily?" else "How many reels a day feels okay?"
+                val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                row.addView(text("🧠", 42, Color.WHITE, false), LinearLayout.LayoutParams(dp(60), dp(78)))
+                row.addView(text(question, 17, ink, true).apply {
+                    background = rounded(Color.rgb(250, 249, 246), 18)
+                    setPadding(dp(16), dp(14), dp(16), dp(14))
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                content.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(20) })
+                val options = if (isTime) listOf("1–3 hours", "3–5 hours", "5–7 hours", "7+ hours") else listOf(25, 50, 100, 150).map { "$it reels" }
+                val selected = if (isTime) onboardingTime else onboardingGoal?.let { "$it reels" }
+                options.forEach { option ->
+                    val choice = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        background = rounded(card, 15)
+                        setPadding(dp(15), 0, dp(15), 0)
+                    }
+                    val active = option == selected
+                    choice.addView(text(if (active) "◉" else "◯", 22, if (active) orange else Color.WHITE, false), LinearLayout.LayoutParams(dp(34), dp(61)))
+                    choice.addView(text(option, 16, Color.WHITE, true), LinearLayout.LayoutParams(0, dp(61), 1f))
+                    choice.setOnClickListener {
+                        if (isTime) onboardingTime = option else onboardingGoal = option.substringBefore(' ').toIntOrNull()
+                        renderOnboarding()
+                    }
+                    content.addView(choice, LinearLayout.LayoutParams(-1, dp(61)).apply { bottomMargin = dp(9) })
+                }
+            }
+            3 -> {
+                content.addView(text("🧠🔒", 56, Color.WHITE, false).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dp(12)) })
+                content.addView(onboardHeading("We only count reels", Color.WHITE).apply { gravity = Gravity.CENTER })
+                val chips = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(0, dp(14), 0, dp(12)) }
+                chips.addView(text("🔒 Saved on this device", 10, orange, true).apply {
+                    background = rounded(card, 30); setPadding(dp(10), dp(8), dp(10), dp(8))
+                })
+                chips.addView(text("Change anytime", 10, orange, true).apply {
+                    background = rounded(card, 30); setPadding(dp(10), dp(8), dp(10), dp(8))
+                }, LinearLayout.LayoutParams(-2, -2).apply { leftMargin = dp(7) })
+                content.addView(chips)
+
+                val settings = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(card, 20); setPadding(dp(15), dp(4), dp(15), dp(4)) }
+                listOf(
+                    "show_count" to "See my count on the dashboard",
+                    "count_all_day" to "Count throughout the day",
+                    "count_every_logged_reel" to "Count every reel I log"
+                ).forEachIndexed { index, (key, label) ->
+                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                    row.addView(text(label, 13, Color.WHITE, true), LinearLayout.LayoutParams(0, dp(57), 1f))
+                    row.addView(android.widget.Switch(this).apply {
+                        isChecked = onboardingPreferences[key] ?: true
+                        setOnCheckedChangeListener { _, checked -> onboardingPreferences[key] = checked }
+                        contentDescription = label
+                    })
+                    settings.addView(row)
+                    if (index < 2) settings.addView(View(this).apply { setBackgroundColor(Color.rgb(42, 40, 35)) }, LinearLayout.LayoutParams(-1, dp(1)))
+                }
+                content.addView(settings)
+                content.addView(text("Your answers stay on this device. Reel counting is manual in this version; these switches save preferences and do not grant background access.", 11, Color.rgb(153, 147, 141), false).apply {
+                    setPadding(dp(2), dp(12), dp(2), 0)
+                })
+            }
+            else -> {
+                content.addView(text("🧠", 68, Color.WHITE, false).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, dp(18)) })
+                content.addView(onboardHeading("Your goal.\nYour pace.", orange).apply { gravity = Gravity.CENTER })
+                content.addView(text("A small step is a good place to start.", 15, Color.rgb(153, 147, 141), false).apply {
+                    gravity = Gravity.CENTER; setPadding(0, dp(12), 0, dp(18))
+                })
+                val summary = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; background = rounded(card, 20); setPadding(dp(18), dp(14), dp(18), dp(14)) }
+                summary.addView(text("YOUR STARTING PLAN", 10, Color.rgb(170, 164, 156), true).apply { letterSpacing = .1f; setPadding(0, 0, 0, dp(6)) })
+                summary.addView(summaryRow("Daily watch time", onboardingTime ?: "Not set"))
+                summary.addView(summaryRow("Your reel goal", "${onboardingGoal ?: 50} a day"))
+                summary.addView(summaryRow("Tracking", "Manual log"))
+                content.addView(summary)
+            }
+        }
+
+        if (onboardingStep > 0) root.addView(text("Back", 12, Color.rgb(170, 164, 156), false).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(8))
+            setOnClickListener { onboardingStep = (onboardingStep - 1).coerceAtLeast(0); renderOnboarding() }
+        })
+        val label = when (onboardingStep) { 0 -> "Let's go"; 4 -> "Open Reel Count"; else -> "Continue" }
+        root.addView(text(label, 15, Color.rgb(77, 53, 30), true).apply {
+            gravity = Gravity.CENTER
+            background = rounded(Color.rgb(255, 197, 133), 50)
+            setPadding(0, dp(17), 0, dp(17))
+            setOnClickListener {
+                when (onboardingStep) {
+                    0 -> { onboardingStep = 1; renderOnboarding() }
+                    1 -> if (onboardingTime == null) Toast.makeText(this@MainActivity, "Choose your daily watch time", Toast.LENGTH_SHORT).show() else { onboardingStep = 2; renderOnboarding() }
+                    2 -> if (onboardingGoal == null) Toast.makeText(this@MainActivity, "Choose a daily reel goal", Toast.LENGTH_SHORT).show() else { onboardingStep = 3; renderOnboarding() }
+                    3 -> { onboardingStep = 4; renderOnboarding() }
+                    else -> {
+                        val goal = onboardingGoal ?: 50
+                        prefs.edit()
+                            .putBoolean("onboarding_complete", true)
+                            .putString("onboard_time", onboardingTime)
+                            .putInt("onboard_goal", goal)
+                            .putInt("goal", goal)
+                            .putBoolean("pref_show_count", onboardingPreferences["show_count"] ?: true)
+                            .putBoolean("pref_count_all_day", onboardingPreferences["count_all_day"] ?: true)
+                            .putBoolean("pref_count_every_logged_reel", onboardingPreferences["count_every_logged_reel"] ?: true)
+                            .apply()
+                        render()
+                    }
+                }
+            }
+        })
+    }
+
+    private fun onboardHeading(value: String, accent: Int) = TextView(this).apply {
+        text = value
+        textSize = 30f
+        setTextColor(accent)
+        typeface = Typeface.create("sans-serif", Typeface.BOLD)
+        gravity = Gravity.CENTER_VERTICAL
+        includeFontPadding = false
+    }
+
+    private fun summaryRow(label: String, value: String) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(text(label, 12, Color.WHITE, false), LinearLayout.LayoutParams(0, dp(36), 1f))
+        addView(text(value, 12, Color.rgb(255, 189, 125), true).apply { gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL })
+    }
+
+    private fun sectionTitle(title: String, subtitle: String): Pair<LinearLayout, TextView> {
+        val block = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(22), 0, dp(11))
+        }
+        block.addView(text(title, 17, ink, true))
+        val sub = text(subtitle, 12, muted, false).apply { setPadding(0, dp(3), 0, 0) }
+        block.addView(sub)
+        return block to sub
+    }
+
+    private fun showGoalDialog() {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(prefs.getInt("goal", 60).toString())
+            setSelection(text.length)
+            setPadding(dp(20), dp(14), dp(20), dp(14))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Set your daily goal")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val goal = input.text.toString().toIntOrNull()
+                if (goal != null && goal > 0) { prefs.edit().putInt("goal", goal).apply(); render() }
+                else Toast.makeText(this, "Enter a number above zero", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun changeCount(day: String, platform: String, delta: Int) {
+        val key = "${platform.lowercase(Locale.ROOT)}_$day"
+        val current = prefs.getInt(key, 0)
+        if (current + delta < 0) return
+        prefs.edit().putInt(key, current + delta).apply()
+    }
+
+    private fun countFor(day: String, platform: String) = prefs.getInt("${platform.lowercase(Locale.ROOT)}_$day", 0)
+
+    private fun totalFor(day: String) = listOf("Instagram", "TikTok", "YouTube").sumOf { countFor(day, it) }
+
+    private fun text(value: String, size: Int, color: Int, bold: Boolean) = TextView(this).apply {
+        text = value
+        textSize = size.toFloat()
+        setTextColor(color)
+        typeface = if (bold) Typeface.create("sans-serif", Typeface.BOLD) else Typeface.create("sans-serif", Typeface.NORMAL)
+        gravity = Gravity.CENTER_VERTICAL
+    }
+
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+}

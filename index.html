@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f2">
+  <meta name="description" content="A simple daily tracker for short videos watched on Instagram, TikTok, and YouTube.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <title>Reel Count</title>
+  <style>
+    :root { color-scheme: light; --ink:#1b231f; --muted:#778079; --paper:#f5f6f2; --lime:#b9f36b; --line:#eceee9; }
+    * { box-sizing:border-box }
+    body { margin:0; background:#e9ece6; color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .stage { min-height:100vh; display:grid; place-items:center; padding:28px 16px; }
+    .phone { width:min(100%,400px); min-height:820px; max-height:900px; overflow:auto; border:8px solid #202622; border-radius:38px; background:var(--paper); box-shadow:0 24px 80px #16201633; scrollbar-width:thin; }
+    .status { height:29px; display:flex; align-items:center; justify-content:space-between; padding:0 21px; font-size:11px; font-weight:700; }
+    main { padding:12px 20px 26px; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+    .brand { font-size:22px; font-weight:780; letter-spacing:-1.1px; }
+    .badge { padding:8px 12px; background:white; border-radius:99px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:1px; }
+    .date { color:var(--muted); font-size:13px; margin:0 0 18px; }
+    .card { background:white; border-radius:25px; padding:21px; }
+    .eyebrow { margin:0; color:var(--muted); font-size:10px; font-weight:800; line-height:1.4; letter-spacing:1.25px; }
+    .count { margin:1px 0 0; font-size:76px; line-height:1; letter-spacing:-5px; font-weight:750; }
+    .caption { margin:5px 0 17px; color:var(--muted); font-size:14px; }
+    .goal-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; }
+    .goal-edit { cursor:pointer; }
+    .track { height:8px; overflow:hidden; margin-top:8px; border-radius:10px; background:#ebede8; }
+    .fill { height:100%; min-width:2px; border-radius:inherit; background:var(--ink); transition:width .25s ease; }
+    .hint { color:var(--muted); font-size:11px; margin:9px 0 16px; }
+    button { font:inherit; cursor:pointer; }
+    .log { width:100%; padding:15px; border:0; border-radius:15px; background:var(--lime); color:var(--ink); font-size:15px; font-weight:750; transition:transform .12s, filter .12s; }
+    .log:active { transform:scale(.98); filter:brightness(.96); }
+    .section { margin:21px 0 10px; }
+    .section h2 { font-size:16px; margin:0; letter-spacing:-.3px; }
+    .section p { color:var(--muted); font-size:11px; margin:4px 0 0; }
+    .platforms { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .platform { padding:11px 4px; border:0; border-radius:22px; background:white; color:var(--ink); font-size:11px; font-weight:650; }
+    .platform.active { background:var(--ink); color:white; }
+    .breakdown { min-height:28px; padding:10px 2px 0; color:var(--muted); font-size:10px; }
+    .week { padding:8px 17px; border-radius:22px; background:white; }
+    .day-row { height:37px; display:grid; grid-template-columns:45px 1fr 30px; gap:8px; align-items:center; font-size:11px; }
+    .day-name { color:var(--muted); }
+    .day-name.today { color:var(--ink); font-weight:700; }
+    .bar-bg { height:7px; overflow:hidden; border-radius:10px; background:#f2f3ef; }
+    .bar { height:100%; border-radius:10px; background:#d7ded4; transition:width .25s ease; }
+    .bar.today { background:var(--lime); }
+    .day-count { text-align:right; font-weight:700; }
+    .undo { display:block; margin:19px auto 0; padding:5px 10px; border:0; background:transparent; color:var(--muted); font-size:12px; }
+    .foot { margin:7px auto 0; color:var(--muted); font-size:10px; line-height:1.5; text-align:center; max-width:270px; }
+    .home { width:90px; height:4px; border-radius:4px; background:#202622; margin:10px auto 6px; }
+    .onboarding { position:fixed; inset:0; z-index:10; display:none; flex-direction:column; background:#090807; color:#f8f6f2; overflow:auto; }
+    .onboarding.active { display:flex; }
+    .onboard-status { flex:none; display:flex; align-items:center; justify-content:space-between; height:38px; padding:0 22px; font-size:11px; font-weight:700; }
+    .onboard-progress { display:flex; gap:5px; padding:4px 22px 12px; }
+    .onboard-progress i { height:3px; flex:1; border-radius:8px; background:#282622; }
+    .onboard-progress i.done { background:#ffbb7a; }
+    .onboard-content { width:min(100%,440px); flex:1; display:flex; flex-direction:column; justify-content:center; margin:0 auto; padding:22px; }
+    .onboard-hero { text-align:center; margin:auto 0; }
+    .brain { width:76px; height:76px; object-fit:contain; line-height:1; margin-bottom:30px; filter:drop-shadow(0 6px 16px #f28d9c22); }
+    .onboard-title { font-size:32px; line-height:1.12; letter-spacing:-1.2px; font-weight:800; margin:0; }
+    .onboard-title span { color:#ffb976; }
+    .onboard-subtitle { color:#99938d; font-size:16px; margin:14px 0 0; }
+    .bubble-row { display:flex; gap:12px; align-items:center; margin-bottom:26px; }
+    .bubble-row .brain { flex:none; width:54px; height:54px; margin:0; }
+    .speech { flex:1; border-radius:20px 20px 20px 5px; padding:16px 18px; background:#faf9f6; color:#191816; font-size:17px; line-height:1.35; font-weight:650; }
+    .choices { display:grid; gap:9px; }
+    .choice { position:relative; display:flex; align-items:center; min-height:61px; padding:0 17px; border-radius:15px; border:1px solid transparent; background:#171613; color:#f8f6f2; font-size:16px; font-weight:600; cursor:pointer; }
+    .choice input { position:absolute; opacity:0; }
+    .choice .radio { width:22px; height:22px; flex:none; margin-right:14px; border:2px solid #f4f0e9; border-radius:50%; }
+    .choice.selected { border-color:#ffb976; background:#201b17; }
+    .choice.selected .radio { border:6px solid #ffb976; }
+    .onboard-footer { width:min(100%,440px); margin:0 auto; padding:14px 22px 24px; }
+    .onboard-next { width:100%; min-height:57px; border:0; border-radius:99px; background:linear-gradient(110deg,#ffe3ae,#ffb56f); color:#4d351e; font-size:15px; font-weight:800; }
+    .onboard-next:disabled { background:#201d19; color:#76716b; }
+    .back-button { display:block; margin:0 auto 5px; border:0; background:transparent; color:#aaa49c; font-size:12px; padding:9px; }
+    .settings-card { padding:5px 14px; border-radius:21px; background:#171613; }
+    .setting { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px 3px; border-bottom:1px solid #2a2823; font-size:14px; font-weight:600; }
+    .setting:last-child { border-bottom:0; }
+    .switch { position:relative; width:48px; height:27px; flex:none; border:0; border-radius:20px; background:#38352f; }
+    .switch::after { content:""; position:absolute; left:3px; top:3px; width:21px; height:21px; border-radius:50%; background:#aaa69e; transition:transform .18s,background .18s; }
+    .switch[aria-checked="true"] { background:#d9a16b; }
+    .switch[aria-checked="true"]::after { transform:translateX(21px); background:#201811; }
+    .privacy-chips { display:flex; gap:7px; flex-wrap:wrap; margin:-7px 0 15px; }
+    .privacy-chips span { padding:7px 10px; border-radius:99px; background:#171613; color:#e3d0b8; font-size:10px; }
+    .privacy-note { color:#99938d; font-size:11px; line-height:1.5; margin:12px 2px 0; }
+    .summary-card { margin:25px 0; padding:18px; border-radius:20px; background:#171613; text-align:left; }
+    .summary-line { display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid #2a2823; font-size:13px; }
+    .summary-line:last-child { border:0; }
+    .summary-line span:last-child { color:#ffbd7d; font-weight:750; text-align:right; }
+    .onboard-kicker { color:#aaa49c; font-size:11px; letter-spacing:1.1px; font-weight:800; margin:0 0 12px; }
+    @media(max-width:480px) { body { background:var(--paper); } .stage { padding:0; display:block; } .phone { width:100%; min-height:100dvh; max-height:none; border:0; border-radius:0; box-shadow:none; } }
+  </style>
+</head>
+<body>
+  <section class="onboarding" id="onboarding" aria-live="polite" aria-label="Reel Count setup">
+    <div class="onboard-status"><span id="onboardClock"></span><span>● ● ●　▰</span></div>
+    <div class="onboard-progress" id="onboardProgress" aria-hidden="true"></div>
+    <div class="onboard-content" id="onboardContent"></div>
+    <div class="onboard-footer" id="onboardFooter"></div>
+  </section>
+  <div class="stage">
+    <div class="phone">
+      <div class="status"><span id="clock">9:41</span><span>● ● ●　▰</span></div>
+      <main>
+        <header><div class="brand">reel count</div><div class="badge">DAILY RESET</div></header>
+        <p class="date" id="date"></p>
+        <section class="card">
+          <p class="eyebrow">YOUR SCROLL,<br>IN NUMBERS</p>
+          <div class="count" id="total">0</div>
+          <p class="caption">reels watched today</p>
+          <div class="goal-row"><button class="goal-edit" id="editGoal" style="border:0;padding:0;background:none;color:inherit;font-weight:inherit">Daily goal · edit</button><span id="goalLabel">0 / 60</span></div>
+          <div class="track"><div class="fill" id="progress"></div></div>
+          <p class="hint" id="hint">60 more to reach your goal</p>
+          <button class="log" id="log">＋　Log 1 reel</button>
+        </section>
+        <div class="section"><h2>Where did you watch?</h2><p>Choose a platform before logging</p></div>
+        <div class="platforms" id="platforms"></div>
+        <div class="breakdown" id="breakdown"></div>
+        <div class="section"><h2>This week</h2><p>Your last 7 days</p></div>
+        <div class="week" id="week"></div>
+        <button class="undo" id="undo">Undo last reel</button>
+        <button class="undo" id="reviewSetup">Review your setup</button>
+        <p class="foot">Counts stay on this device. Tap the goal to change your daily target.</p>
+      </main>
+      <div class="home"></div>
+    </div>
+  </div>
+  <script>
+    const platforms = ['Instagram', 'TikTok', 'YouTube'];
+    const today = new Date();
+    const keyFor = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const todayKey = keyFor(today);
+    let selected = 'Instagram';
+    let goal = Number(localStorage.getItem('reel-preview-goal')) || 60;
+    let savedProfile = JSON.parse(localStorage.getItem('reel-onboarding-profile') || 'null');
+    let onboardingStep = 0;
+    const onboardingAnswers = {
+      watchTime: savedProfile?.watchTime || '',
+      dailyGoal: savedProfile?.dailyGoal || '',
+      preferences: savedProfile?.preferences || { showCount: true, countAllDay: true, countEveryLoggedReel: true }
+    };
+    const get = (day, app) => Number(localStorage.getItem(`reel-preview-${day}-${app}`)) || 0;
+    const set = (day, app, n) => localStorage.setItem(`reel-preview-${day}-${app}`, String(Math.max(0,n)));
+    const totalFor = day => platforms.reduce((sum, app) => sum + get(day, app), 0);
+    document.getElementById('date').textContent = new Intl.DateTimeFormat(undefined,{weekday:'long',day:'numeric',month:'long'}).format(today);
+    document.getElementById('clock').textContent = new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit'}).format(today);
+    document.getElementById('onboardClock').textContent = document.getElementById('clock').textContent;
+    function showOnboarding() {
+      onboardingStep = 0;
+      document.getElementById('onboarding').classList.add('active');
+      renderOnboarding();
+    }
+    function renderOnboarding() {
+      const content = document.getElementById('onboardContent');
+      const footer = document.getElementById('onboardFooter');
+      const progress = document.getElementById('onboardProgress');
+      progress.innerHTML = Array.from({length:5},(_,i)=>`<i class="${i<=onboardingStep?'done':''}"></i>`).join('');
+      const continueButton = (label,disabled=false) => `<button class="onboard-next" id="onboardNext" ${disabled?'disabled':''}>${label}</button>`;
+      if (onboardingStep === 0) {
+        content.innerHTML = `<div class="onboard-hero"><img class="brain" aria-hidden="true" src="/brain-mascot.svg"><h1 class="onboard-title">Win back<br><span>study time</span></h1><p class="onboard-subtitle">Starting today.</p></div>`;
+        footer.innerHTML = continueButton("Let's go");
+      } else if (onboardingStep === 1 || onboardingStep === 2) {
+        const isTime = onboardingStep === 1;
+        const values = isTime ? ['1–3 hours','3–5 hours','5–7 hours','7+ hours'] : ['25 reels','50 reels','100 reels','150 reels'];
+        const selected = isTime ? onboardingAnswers.watchTime : (onboardingAnswers.dailyGoal ? `${onboardingAnswers.dailyGoal} reels` : '');
+        const question = isTime ? 'How much time do you spend on Reels/Shorts daily?' : 'How many reels a day feels okay?';
+        content.innerHTML = `<div class="bubble-row"><img class="brain" aria-hidden="true" src="/brain-mascot.svg"><div class="speech">${question}</div></div><div class="choices">${values.map(value=>`<label class="choice ${selected===value?'selected':''}"><span class="radio"></span><input type="radio" name="answer" value="${value}" ${selected===value?'checked':''}>${value}</label>`).join('')}</div>`;
+        footer.innerHTML = `<button class="back-button" id="onboardBack">Back</button>${continueButton('Continue',!selected)}`;
+        content.querySelectorAll('input[name="answer"]').forEach(input=>input.addEventListener('change',()=>{if(isTime)onboardingAnswers.watchTime=input.value;else{onboardingAnswers.dailyGoal=input.value.split(' ')[0];}renderOnboarding();}));
+      } else if (onboardingStep === 3) {
+        const settings = [
+          ['showCount','See my count on the dashboard'],
+          ['countAllDay','Count throughout the day'],
+          ['countEveryLoggedReel','Count every reel I log']
+        ];
+        content.innerHTML = `<div class="onboard-hero" style="text-align:left;margin:auto 0"><div class="brain" style="position:relative;margin:0 auto 16px"><img src="/brain-mascot.svg" alt=""><span style="position:absolute;right:-5px;bottom:0;font-size:28px">🔒</span></div><h1 class="onboard-title" style="font-size:25px;text-align:center;margin-bottom:16px">We only count reels</h1><div class="privacy-chips"><span>🔒 Saved on this device</span><span>Change anytime</span></div><div class="settings-card">${settings.map(([key,label])=>`<div class="setting"><span>${label}</span><button class="switch" type="button" role="switch" aria-label="${label}" aria-checked="${Boolean(onboardingAnswers.preferences[key])}" data-pref="${key}"></button></div>`).join('')}</div><p class="privacy-note">Your answers stay on this device. Reel counting is manual in this version; these switches save your preferences and do not grant background access.</p></div>`;
+        footer.innerHTML = `<button class="back-button" id="onboardBack">Back</button>${continueButton('Continue')}`;
+        content.querySelectorAll('.switch').forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.pref;onboardingAnswers.preferences[key]=!onboardingAnswers.preferences[key];renderOnboarding();}));
+      } else {
+        const target=Number(onboardingAnswers.dailyGoal)||50;
+        content.innerHTML = `<div class="onboard-hero"><img class="brain" aria-hidden="true" src="/brain-mascot.svg"><h1 class="onboard-title">Your goal.<br><span>Your pace.</span></h1><p class="onboard-subtitle">A small step is a good place to start.</p><div class="summary-card"><p class="onboard-kicker">YOUR STARTING PLAN</p><div class="summary-line"><span>Daily watch time</span><span>${onboardingAnswers.watchTime||'Not set'}</span></div><div class="summary-line"><span>Your reel goal</span><span>${target} a day</span></div><div class="summary-line"><span>Tracking</span><span>Manual log</span></div></div></div>`;
+        footer.innerHTML = continueButton('Open Reel Count');
+      }
+      document.getElementById('onboardNext').addEventListener('click',()=>{
+        if(onboardingStep===0){onboardingStep=1;renderOnboarding();return;}
+        if(onboardingStep===1&&!onboardingAnswers.watchTime)return;
+        if(onboardingStep===2&&!onboardingAnswers.dailyGoal)return;
+        if(onboardingStep<4){onboardingStep++;renderOnboarding();return;}
+        const profile={watchTime:onboardingAnswers.watchTime,dailyGoal:Number(onboardingAnswers.dailyGoal),preferences:onboardingAnswers.preferences,completedAt:new Date().toISOString()};
+        localStorage.setItem('reel-onboarding-profile',JSON.stringify(profile));
+        localStorage.setItem('reel-onboarding-complete','true');
+        localStorage.setItem('reel-preview-goal',String(profile.dailyGoal));
+        savedProfile=profile;
+        goal=profile.dailyGoal;
+        document.getElementById('onboarding').classList.remove('active');
+        render();
+      });
+      document.getElementById('onboardBack')?.addEventListener('click',()=>{onboardingStep=Math.max(0,onboardingStep-1);renderOnboarding();});
+    }
+    function render() {
+      const total = totalFor(todayKey);
+      const showCount = savedProfile?.preferences?.showCount !== false;
+      document.getElementById('total').textContent = showCount ? total : '•••';
+      document.getElementById('goalLabel').textContent = showCount ? `${total} / ${goal}` : `••• / ${goal}`;
+      document.getElementById('progress').style.width = showCount ? `${Math.min(total/goal*100,100)}%` : '0%';
+      document.getElementById('hint').textContent = !showCount ? 'Count display is hidden. You can still log reels.' : total >= goal ? "You reached today's goal." : `${goal-total} more to reach your goal`;
+      document.getElementById('platforms').innerHTML = platforms.map(app => `<button class="platform ${app===selected?'active':''}" data-app="${app}">${app}</button>`).join('');
+      document.querySelectorAll('.platform').forEach(button => button.addEventListener('click', () => { selected=button.dataset.app; render(); }));
+      const counts = platforms.map(app=>[app,get(todayKey,app)]).filter(([,n])=>n>0);
+      document.getElementById('breakdown').textContent = showCount ? counts.map(([app,n])=>`${app} ${n}`).join('　·　') : 'Your daily count is hidden';
+      const days = Array.from({length:7},(_,i)=>{const d=new Date(today);d.setDate(d.getDate()-6+i);return d;});
+      const max = Math.max(1,...days.map(d=>totalFor(keyFor(d))));
+      document.getElementById('week').innerHTML = days.map(d=>{const k=keyFor(d),n=totalFor(k),isToday=k===todayKey,label=isToday?'Today':new Intl.DateTimeFormat(undefined,{weekday:'short'}).format(d);return `<div class="day-row"><span class="day-name ${isToday?'today':''}">${label}</span><div class="bar-bg"><div class="bar ${isToday?'today':''}" style="width:${n?Math.max(4,n/max*100):0}%"></div></div><span class="day-count">${n}</span></div>`}).join('');
+    }
+    document.getElementById('log').addEventListener('click',()=>{set(todayKey,selected,get(todayKey,selected)+1);render();});
+    document.getElementById('undo').addEventListener('click',()=>{if(get(todayKey,selected)>0){set(todayKey,selected,get(todayKey,selected)-1);render();}});
+    document.getElementById('editGoal').addEventListener('click',()=>{const answer=prompt('Set your daily goal',String(goal));const n=Number(answer);if(answer!==null&&Number.isInteger(n)&&n>0){goal=n;localStorage.setItem('reel-preview-goal',String(goal));render();}});
+    document.getElementById('reviewSetup').addEventListener('click',showOnboarding);
+    if(localStorage.getItem('reel-onboarding-complete')==='true')render();else showOnboarding();
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
