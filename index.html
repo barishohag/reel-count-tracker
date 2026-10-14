@@ -3,54 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f6f2">
+  <meta name="theme-color" content="#f6f8f4">
   <meta name="description" content="A simple daily tracker for short videos watched on Instagram, TikTok, and YouTube.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <title>Reel Count</title>
   <style>
-    :root { color-scheme: light; --ink:#1b231f; --muted:#778079; --paper:#f5f6f2; --lime:#b9f36b; --line:#eceee9; }
+    :root { color-scheme:light; --ink:#18211d; --muted:#79827b; --paper:#f6f8f4; --lime:#c2ee86; --line:#e9eee8; --green:#315744; --card:#fff; }
     * { box-sizing:border-box }
-    body { margin:0; background:#e9ece6; color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
-    .stage { min-height:100vh; display:grid; place-items:center; padding:28px 16px; }
-    .phone { width:min(100%,400px); min-height:820px; max-height:900px; overflow:auto; border:8px solid #202622; border-radius:38px; background:var(--paper); box-shadow:0 24px 80px #16201633; scrollbar-width:thin; }
-    .status { height:29px; display:flex; align-items:center; justify-content:space-between; padding:0 21px; font-size:11px; font-weight:700; }
-    main { padding:12px 20px 26px; }
-    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
-    .brand { font-size:22px; font-weight:780; letter-spacing:-1.1px; }
-    .badge { padding:8px 12px; background:white; border-radius:99px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:1px; }
-    .date { color:var(--muted); font-size:13px; margin:0 0 18px; }
-    .card { background:white; border-radius:25px; padding:21px; }
-    .eyebrow { margin:0; color:var(--muted); font-size:10px; font-weight:800; line-height:1.4; letter-spacing:1.25px; }
-    .count { margin:1px 0 0; font-size:76px; line-height:1; letter-spacing:-5px; font-weight:750; }
-    .caption { margin:5px 0 17px; color:var(--muted); font-size:14px; }
-    .goal-row { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; }
-    .goal-edit { cursor:pointer; }
-    .track { height:8px; overflow:hidden; margin-top:8px; border-radius:10px; background:#ebede8; }
-    .fill { height:100%; min-width:2px; border-radius:inherit; background:var(--ink); transition:width .25s ease; }
-    .hint { color:var(--muted); font-size:11px; margin:9px 0 16px; }
+    body { margin:0; background:var(--paper); color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
     button { font:inherit; cursor:pointer; }
-    .log { width:100%; padding:15px; border:0; border-radius:15px; background:var(--lime); color:var(--ink); font-size:15px; font-weight:750; transition:transform .12s, filter .12s; }
-    .log:active { transform:scale(.98); filter:brightness(.96); }
-    .section { margin:21px 0 10px; }
-    .section h2 { font-size:16px; margin:0; letter-spacing:-.3px; }
-    .section p { color:var(--muted); font-size:11px; margin:4px 0 0; }
-    .platforms { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-    .platform { padding:11px 4px; border:0; border-radius:22px; background:white; color:var(--ink); font-size:11px; font-weight:650; }
-    .platform.active { background:var(--ink); color:white; }
-    .breakdown { min-height:28px; padding:10px 2px 0; color:var(--muted); font-size:10px; }
-    .week { padding:8px 17px; border-radius:22px; background:white; }
-    .day-row { height:37px; display:grid; grid-template-columns:45px 1fr 30px; gap:8px; align-items:center; font-size:11px; }
+    button:focus-visible,a:focus-visible { outline:3px solid #82ad72; outline-offset:3px; }
+    .stage { min-height:100vh; padding:0; }
+    .dashboard { width:min(100%,1440px); min-height:100vh; display:grid; grid-template-columns:238px minmax(0,1fr); margin:0 auto; background:#fbfcfa; }
+    .sidebar { position:sticky; top:0; height:100vh; display:flex; flex-direction:column; padding:30px 18px 22px; border-right:1px solid var(--line); background:#fff; }
+    .brand { display:flex; align-items:center; gap:11px; padding:0 10px; color:var(--ink); text-decoration:none; font-size:20px; font-weight:790; letter-spacing:-.8px; }
+    .brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:12px; background:var(--lime); font-size:18px; font-weight:850; }
+    .sidebar-label { margin:42px 11px 10px; color:#98a19a; font-size:10px; font-weight:800; letter-spacing:1.15px; }
+    .nav-item { display:flex; align-items:center; gap:12px; width:100%; padding:12px 13px; border:0; border-radius:12px; background:transparent; color:#68736c; text-align:left; font-size:13px; font-weight:650; }
+    .nav-item.active { background:#eef5e9; color:var(--green); }
+    .nav-icon { display:grid; place-items:center; width:20px; height:20px; font-size:16px; }
+    .sidebar-bottom { margin-top:auto; padding:16px 12px 3px; border-top:1px solid var(--line); }
+    .privacy-title { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:720; }
+    .privacy-dot { width:8px; height:8px; border-radius:50%; background:#7bbf72; box-shadow:0 0 0 3px #7bbf7224; }
+    .privacy-copy { margin:7px 0 0 16px; color:var(--muted); font-size:11px; line-height:1.5; }
+    .main { min-width:0; padding:26px clamp(20px,4vw,56px) 44px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; min-height:38px; }
+    .topbar-context { display:flex; align-items:center; gap:12px; }
+    .topbar-label { color:#8b948d; font-size:10px; font-weight:800; letter-spacing:1.2px; }
+    .badge { padding:7px 10px; border:1px solid var(--line); background:white; border-radius:99px; color:#778079; font-size:9px; font-weight:800; letter-spacing:.7px; }
+    .setup-link { border:0; background:transparent; color:#66746b; font-size:12px; font-weight:700; }
+    .welcome { display:flex; align-items:end; justify-content:space-between; gap:20px; margin:43px 0 25px; }
+    .date { color:var(--muted); font-size:13px; margin:0 0 8px; }
+    .welcome h1 { margin:0; font-size:clamp(26px,3vw,34px); line-height:1.1; letter-spacing:-1.15px; }
+    .welcome-copy { margin:8px 0 0; color:var(--muted); font-size:13px; }
+    .goal-edit { flex:none; padding:10px 14px; border:1px solid var(--line); border-radius:12px; background:white; color:var(--ink); font-size:12px; font-weight:700; }
+    .dashboard-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr); gap:18px; align-items:start; }
+    .card { min-width:0; padding:23px; border:1px solid #edf0eb; border-radius:20px; background:var(--card); box-shadow:0 8px 26px #22332308; }
+    .today-card { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,.8fr); gap:34px; align-items:center; padding:27px 30px; background:linear-gradient(115deg,#eef6e9 0%,#f7faf3 72%,#fff 100%); }
+    .eyebrow { margin:0; color:#738078; font-size:10px; font-weight:800; line-height:1.4; letter-spacing:1.1px; }
+    .count-line { display:flex; align-items:baseline; gap:11px; margin:7px 0 0; }
+    .count { font-size:clamp(60px,8vw,84px); line-height:.95; letter-spacing:-5px; font-weight:760; font-variant-numeric:tabular-nums; }
+    .caption { color:var(--muted); font-size:14px; }
+    .goal-block { padding-left:24px; border-left:1px solid #dfe8da; }
+    .goal-row { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; font-weight:700; }
+    .goal-row span:last-child { color:#56655a; font-variant-numeric:tabular-nums; }
+    .track { height:9px; overflow:hidden; margin-top:11px; border-radius:10px; background:#dfe8d9; }
+    .fill { height:100%; min-width:0; border-radius:inherit; background:var(--green); transition:width .25s ease; }
+    .hint { color:#758076; font-size:11px; margin:9px 0 0; }
+    .card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:20px; }
+    .card-head h2 { margin:0; font-size:16px; letter-spacing:-.25px; }
+    .card-head p { margin:5px 0 0; color:var(--muted); font-size:11px; line-height:1.45; }
+    .quick-card { grid-column:1; }
+    .platforms { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+    .platform { display:flex; align-items:center; gap:9px; min-height:47px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:#fff; color:#526057; font-size:12px; font-weight:650; text-align:left; transition:background .16s,border-color .16s,color .16s; }
+    .platform.active { border-color:#bed5b8; background:#f1f7ed; color:var(--green); }
+    .platform-dot { display:grid; place-items:center; width:24px; height:24px; flex:none; border-radius:8px; background:#edf0ed; color:#56655b; font-size:10px; font-weight:800; }
+    .platform.active .platform-dot { background:#dcebd4; color:var(--green); }
+    .log { width:100%; margin-top:17px; padding:13px 15px; border:0; border-radius:12px; background:var(--ink); color:white; font-size:13px; font-weight:750; transition:transform .12s,filter .12s; }
+    .log:hover { filter:brightness(1.12); }
+    .log:active { transform:scale(.99); }
+    .breakdown { display:grid; gap:12px; }
+    .platform-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(70px,.9fr) 34px; gap:12px; align-items:center; font-size:11px; }
+    .platform-name { display:flex; align-items:center; gap:8px; color:#556159; font-weight:650; }
+    .platform-bar { height:7px; overflow:hidden; border-radius:10px; background:#f0f2ee; }
+    .platform-fill { height:100%; border-radius:inherit; background:#b7dca7; }
+    .platform-value { text-align:right; color:#48544c; font-weight:750; font-variant-numeric:tabular-nums; }
+    .hidden-count { grid-column:1/-1; padding:10px 12px; border-radius:10px; background:#f6f8f5; color:var(--muted); line-height:1.5; }
+    .week-card { grid-column:2; grid-row:2; }
+    .week { display:grid; gap:9px; }
+    .day-row { display:grid; grid-template-columns:48px minmax(0,1fr) 30px; gap:10px; align-items:center; min-height:25px; font-size:11px; }
     .day-name { color:var(--muted); }
-    .day-name.today { color:var(--ink); font-weight:700; }
-    .bar-bg { height:7px; overflow:hidden; border-radius:10px; background:#f2f3ef; }
-    .bar { height:100%; border-radius:10px; background:#d7ded4; transition:width .25s ease; }
-    .bar.today { background:var(--lime); }
-    .day-count { text-align:right; font-weight:700; }
-    .undo { display:block; margin:19px auto 0; padding:5px 10px; border:0; background:transparent; color:var(--muted); font-size:12px; }
-    .foot { margin:7px auto 0; color:var(--muted); font-size:10px; line-height:1.5; text-align:center; max-width:270px; }
-    .home { width:90px; height:4px; border-radius:4px; background:#202622; margin:10px auto 6px; }
+    .day-name.today { color:var(--green); font-weight:750; }
+    .bar-bg { height:7px; overflow:hidden; border-radius:10px; background:#f0f2ee; }
+    .bar { height:100%; border-radius:10px; background:#d6ded4; transition:width .25s ease; }
+    .bar.today { background:#9cca7c; }
+    .day-count { text-align:right; color:#526057; font-weight:700; font-variant-numeric:tabular-nums; }
+    .week-note { margin:16px 0 0; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.5; }
+    .actions-row { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:20px; }
+    .undo { padding:6px 0; border:0; background:transparent; color:#778079; font-size:11px; }
+    .undo:disabled { cursor:not-allowed; opacity:.45; }
+    .foot { margin:22px 0 0; color:#909991; font-size:10px; line-height:1.5; }
     .onboarding { position:fixed; inset:0; z-index:10; display:none; flex-direction:column; background:#090807; color:#f8f6f2; overflow:auto; }
     .onboarding.active { display:flex; }
     .onboard-status { flex:none; display:flex; align-items:center; justify-content:space-between; height:38px; padding:0 22px; font-size:11px; font-weight:700; }
@@ -91,7 +125,8 @@
     .summary-line:last-child { border:0; }
     .summary-line span:last-child { color:#ffbd7d; font-weight:750; text-align:right; }
     .onboard-kicker { color:#aaa49c; font-size:11px; letter-spacing:1.1px; font-weight:800; margin:0 0 12px; }
-    @media(max-width:480px) { body { background:var(--paper); } .stage { padding:0; display:block; } .phone { width:100%; min-height:100dvh; max-height:none; border:0; border-radius:0; box-shadow:none; } }
+    @media(max-width:900px) { .dashboard { grid-template-columns:190px minmax(0,1fr); } .sidebar { padding-inline:13px; } .main { padding-inline:26px; } .dashboard-grid { grid-template-columns:minmax(0,1fr) minmax(250px,.8fr); gap:13px; } .today-card { grid-template-columns:1fr; gap:20px; } .goal-block { padding:0; border:0; } }
+    @media(max-width:680px) { .dashboard { display:block; } .sidebar { position:static; width:100%; height:auto; flex-direction:row; align-items:center; justify-content:space-between; padding:15px 18px; border-right:0; border-bottom:1px solid var(--line); } .brand { padding:0; font-size:18px; } .brand-mark { width:31px; height:31px; } .sidebar-label,.nav-item,.sidebar-bottom { display:none; } .main { padding:20px 16px 32px; } .topbar { min-height:28px; } .topbar-label { font-size:9px; } .badge { padding:6px 8px; font-size:8px; } .setup-link { font-size:11px; } .welcome { align-items:flex-start; margin:30px 0 19px; } .welcome h1 { font-size:27px; } .welcome-copy { max-width:260px; font-size:12px; line-height:1.5; } .goal-edit { padding:9px 10px; font-size:10px; } .dashboard-grid { grid-template-columns:1fr; gap:12px; } .today-card,.quick-card,.week-card { grid-column:1; grid-row:auto; } .today-card { gap:16px; padding:21px; } .count { font-size:68px; } .caption { font-size:12px; } .card { padding:19px; border-radius:17px; } .card-head { margin-bottom:16px; } .platform { justify-content:center; flex-direction:column; gap:5px; min-height:64px; padding:8px 4px; font-size:10px; } .platform-dot { width:22px; height:22px; } .actions-row { margin-top:14px; } }
   </style>
 </head>
 <body>
@@ -102,30 +137,48 @@
     <div class="onboard-footer" id="onboardFooter"></div>
   </section>
   <div class="stage">
-    <div class="phone">
-      <div class="status"><span id="clock">9:41</span><span>● ● ●　▰</span></div>
-      <main>
-        <header><div class="brand">reel count</div><div class="badge">DAILY RESET</div></header>
-        <p class="date" id="date"></p>
-        <section class="card">
-          <p class="eyebrow">YOUR SCROLL,<br>IN NUMBERS</p>
-          <div class="count" id="total">0</div>
-          <p class="caption">reels watched today</p>
-          <div class="goal-row"><button class="goal-edit" id="editGoal" style="border:0;padding:0;background:none;color:inherit;font-weight:inherit">Daily goal · edit</button><span id="goalLabel">0 / 60</span></div>
-          <div class="track"><div class="fill" id="progress"></div></div>
-          <p class="hint" id="hint">60 more to reach your goal</p>
-          <button class="log" id="log">＋　Log 1 reel</button>
+    <div class="dashboard">
+      <aside class="sidebar" aria-label="Main navigation">
+        <a class="brand" href="/" aria-label="Reel Count home"><span class="brand-mark">R</span><span>reel count</span></a>
+        <p class="sidebar-label">YOUR SPACE</p>
+        <div class="nav-item active"><span class="nav-icon" aria-hidden="true">▦</span><span>Overview</span></div>
+        <div class="sidebar-bottom">
+          <div class="privacy-title"><span class="privacy-dot" aria-hidden="true"></span>Private by default</div>
+          <p class="privacy-copy">Your log stays in this browser on this device.</p>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div class="topbar-context"><span class="topbar-label">PERSONAL DASHBOARD</span><span class="badge">DAILY RESET</span></div>
+          <button class="setup-link" id="reviewSetup" type="button">Review setup</button>
+        </div>
+        <section class="welcome">
+          <div><p class="date" id="date"></p><h1>Your daily rhythm</h1><p class="welcome-copy">A simple view of the reels you choose to log.</p></div>
+          <button class="goal-edit" id="editGoal" type="button">Edit daily goal</button>
         </section>
-        <div class="section"><h2>Where did you watch?</h2><p>Choose a platform before logging</p></div>
-        <div class="platforms" id="platforms"></div>
-        <div class="breakdown" id="breakdown"></div>
-        <div class="section"><h2>This week</h2><p>Your last 7 days</p></div>
-        <div class="week" id="week"></div>
-        <button class="undo" id="undo">Undo last reel</button>
-        <button class="undo" id="reviewSetup">Review your setup</button>
-        <p class="foot">Counts stay on this device. Tap the goal to change your daily target.</p>
+        <div class="dashboard-grid">
+          <section class="card today-card" aria-labelledby="todayHeading">
+            <div><p class="eyebrow" id="todayHeading">REELS LOGGED TODAY</p><div class="count-line"><span class="count" id="total">0</span><span class="caption">reels</span></div></div>
+            <div class="goal-block"><div class="goal-row"><span>Daily goal progress</span><span id="goalLabel">0 / 60</span></div><div class="track" role="progressbar" aria-label="Daily reel goal progress" aria-valuemin="0" aria-valuemax="60" aria-valuenow="0"><div class="fill" id="progress"></div></div><p class="hint" id="hint">60 more to reach your goal</p></div>
+          </section>
+          <section class="card quick-card" aria-labelledby="quickHeading">
+            <div class="card-head"><div><h2 id="quickHeading">Quick log</h2><p>Choose where you watched, then add one reel.</p></div></div>
+            <div class="platforms" id="platforms" role="group" aria-label="Choose a platform"></div>
+            <button class="log" id="log" type="button">＋　Log 1 reel</button>
+            <div class="actions-row"><button class="undo" id="undo" type="button">Undo last log</button><span class="privacy-copy">Saved on this device</span></div>
+          </section>
+          <section class="card breakdown-card" aria-labelledby="breakdownHeading">
+            <div class="card-head"><div><h2 id="breakdownHeading">Platform breakdown</h2><p>Today's logged reels by app.</p></div></div>
+            <div class="breakdown" id="breakdown"></div>
+          </section>
+          <section class="card week-card" aria-labelledby="weekHeading">
+            <div class="card-head"><div><h2 id="weekHeading">This week</h2><p>Daily totals for the last 7 days.</p></div></div>
+            <div class="week" id="week" aria-label="Last seven days of reel activity"></div>
+            <p class="week-note">Your history is stored locally in this browser. Reel counts are added manually.</p>
+          </section>
+        </div>
+        <p class="foot">Reel Count helps you notice your habits. It does not read activity from other apps.</p>
       </main>
-      <div class="home"></div>
     </div>
   </div>
   <script>
@@ -146,8 +199,7 @@
     const set = (day, app, n) => localStorage.setItem(`reel-preview-${day}-${app}`, String(Math.max(0,n)));
     const totalFor = day => platforms.reduce((sum, app) => sum + get(day, app), 0);
     document.getElementById('date').textContent = new Intl.DateTimeFormat(undefined,{weekday:'long',day:'numeric',month:'long'}).format(today);
-    document.getElementById('clock').textContent = new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit'}).format(today);
-    document.getElementById('onboardClock').textContent = document.getElementById('clock').textContent;
+    document.getElementById('onboardClock').textContent = new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit'}).format(today);
     function showOnboarding() {
       onboardingStep = 0;
       document.getElementById('onboarding').classList.add('active');
@@ -205,15 +257,24 @@
       const showCount = savedProfile?.preferences?.showCount !== false;
       document.getElementById('total').textContent = showCount ? total : '•••';
       document.getElementById('goalLabel').textContent = showCount ? `${total} / ${goal}` : `••• / ${goal}`;
-      document.getElementById('progress').style.width = showCount ? `${Math.min(total/goal*100,100)}%` : '0%';
+      const progress = document.getElementById('progress');
+      progress.style.width = showCount ? `${Math.min(total/goal*100,100)}%` : '0%';
+      progress.parentElement.setAttribute('aria-valuemax', String(goal));
+      progress.parentElement.setAttribute('aria-valuenow', showCount ? String(Math.min(total,goal)) : '0');
+      progress.parentElement.setAttribute('aria-label', showCount ? 'Daily reel goal progress' : 'Progress display hidden');
       document.getElementById('hint').textContent = !showCount ? 'Count display is hidden. You can still log reels.' : total >= goal ? "You reached today's goal." : `${goal-total} more to reach your goal`;
-      document.getElementById('platforms').innerHTML = platforms.map(app => `<button class="platform ${app===selected?'active':''}" data-app="${app}">${app}</button>`).join('');
+      const shortNames = {Instagram:'IG',TikTok:'TK',YouTube:'YT'};
+      document.getElementById('platforms').innerHTML = platforms.map(app => `<button class="platform ${app===selected?'active':''}" type="button" data-app="${app}" aria-pressed="${app===selected}"><span class="platform-dot" aria-hidden="true">${shortNames[app]}</span><span>${app}</span></button>`).join('');
       document.querySelectorAll('.platform').forEach(button => button.addEventListener('click', () => { selected=button.dataset.app; render(); }));
-      const counts = platforms.map(app=>[app,get(todayKey,app)]).filter(([,n])=>n>0);
-      document.getElementById('breakdown').textContent = showCount ? counts.map(([app,n])=>`${app} ${n}`).join('　·　') : 'Your daily count is hidden';
+      document.getElementById('log').textContent = `＋　Log 1 reel on ${selected}`;
+      document.getElementById('undo').disabled = get(todayKey,selected) === 0;
+      const counts = platforms.map(app=>[app,get(todayKey,app)]);
+      const maxPlatformCount = Math.max(1,...counts.map(([,n])=>n));
+      document.getElementById('breakdown').innerHTML = showCount ? counts.map(([app,n])=>`<div class="platform-row"><span class="platform-name"><span class="platform-dot" aria-hidden="true">${shortNames[app]}</span>${app}</span><div class="platform-bar" aria-hidden="true"><div class="platform-fill" style="width:${n?Math.max(5,n/maxPlatformCount*100):0}%"></div></div><span class="platform-value">${n}</span></div>`).join('') : '<div class="hidden-count">Your platform totals are hidden by your setup preferences.</div>';
       const days = Array.from({length:7},(_,i)=>{const d=new Date(today);d.setDate(d.getDate()-6+i);return d;});
       const max = Math.max(1,...days.map(d=>totalFor(keyFor(d))));
-      document.getElementById('week').innerHTML = days.map(d=>{const k=keyFor(d),n=totalFor(k),isToday=k===todayKey,label=isToday?'Today':new Intl.DateTimeFormat(undefined,{weekday:'short'}).format(d);return `<div class="day-row"><span class="day-name ${isToday?'today':''}">${label}</span><div class="bar-bg"><div class="bar ${isToday?'today':''}" style="width:${n?Math.max(4,n/max*100):0}%"></div></div><span class="day-count">${n}</span></div>`}).join('');
+      document.getElementById('week').setAttribute('aria-label', showCount ? 'Last seven days of reel activity' : 'Weekly count display is hidden');
+      document.getElementById('week').innerHTML = days.map(d=>{const k=keyFor(d),n=totalFor(k),isToday=k===todayKey,label=isToday?'Today':new Intl.DateTimeFormat(undefined,{weekday:'short'}).format(d);return `<div class="day-row"><span class="day-name ${isToday?'today':''}">${label}</span><div class="bar-bg" aria-hidden="true"><div class="bar ${isToday?'today':''}" style="width:${showCount&&n?Math.max(4,n/max*100):0}%"></div></div><span class="day-count">${showCount?n:'—'}</span></div>`}).join('');
     }
     document.getElementById('log').addEventListener('click',()=>{set(todayKey,selected,get(todayKey,selected)+1);render();});
     document.getElementById('undo').addEventListener('click',()=>{if(get(todayKey,selected)>0){set(todayKey,selected,get(todayKey,selected)-1);render();}});

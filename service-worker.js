@@ -1,4 +1,4 @@
-const CACHE_NAME = "reel-count-v2";
+const CACHE_NAME = "reel-count-v3";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg", "/brain-mascot.svg"];
 
 self.addEventListener("install", event => {
